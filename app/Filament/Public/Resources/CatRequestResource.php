@@ -216,19 +216,17 @@ class CatRequestResource extends Resource
                                     ->height(120)
                                     ->width(120)
                                     ->alignCenter()
+                                    ->url(fn ($state) => $state ? asset('storage/' . ltrim($state, '/')) : null)
                                     ->visible(fn ($state) => !empty($state)),
-
-                                TextEntry::make('consigne_enabled')
+                                    
+                                TextEntry::make('consigne_type')
                                     ->label('Consigne')
                                     ->size(TextEntry\TextEntrySize::Large)
-                                    ->formatStateUsing(function ($state, $record) {
-                                        if (!($state ?? false)) {
-                                            return 'Non';
-                                        }
-
-                                        return match ($record['consigne_type'] ?? '') {
-                                            'ecocup' => 'Oui (Écocup 1€)',
-                                            'assiette' => 'Oui (Assiette 1€)',
+                                    ->visible(fn ($state) => !empty($state))
+                                    ->formatStateUsing(function ($state) {
+                                        return match ($state ?? '') {
+                                            'ecocup' => 'Écocup 1€',
+                                            'assiette' => 'Assiette 1€',
                                             default => 'Oui',
                                         };
                                     }),

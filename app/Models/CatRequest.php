@@ -34,11 +34,6 @@ class CatRequest extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function files(): HasMany
-    {
-        return $this->hasMany(CatRequestFile::class);
-    }
-
     public function getStatusLabelAttribute(): string
     {
         return match($this->status) {
