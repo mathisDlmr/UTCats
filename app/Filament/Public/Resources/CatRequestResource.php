@@ -154,8 +154,33 @@ class CatRequestResource extends Resource
                             ->extraAttributes(['style' => 'font-size:3rem;']),
                     ])
                     ->columnSpanFull(),
+                
+                Section::make('Informations générales')
+                    ->icon('heroicon-o-information-circle')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextEntry::make('cats_count')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Nombre de CATs'),
+                            TextEntry::make('tpe_count')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Nombre de TPE'),
+                        ]),
+                        Grid::make(2)->schema([
+                            TextEntry::make('start_date')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Date de début')
+                                ->formatStateUsing(fn ($state) => ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y'))),
+                            TextEntry::make('end_date')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Date de fin')
+                                ->formatStateUsing(fn ($state) => ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y'))),
+                        ]),
+                    ]),
 
                 Section::make('Responsables')
+                    ->icon('heroicon-o-users')
+                    ->description("Membres de l'asso capables de déverouiller et annuler des ventes sur les CATs")
                     ->schema([
                         RepeatableEntry::make('responsibles')
                             ->label('')
@@ -171,44 +196,44 @@ class CatRequestResource extends Resource
                     ->columnSpanFull(),
 
                 Section::make('Articles')
+                    ->icon('heroicon-o-shopping-cart')
                     ->schema([
                         RepeatableEntry::make('articles')
                             ->label('')
                             ->schema([
                                 TextEntry::make('name')
                                     ->label('Nom')
-                                    ->formatStateUsing(function ($state, $record) {
-                                        $name = $record['name'] ?? '';
-                                        $price = $record['price'] ?? '0';
-                                        return "{$name} - {$price} €";
-                                    })
-                                    ->size('md')
-                                    ->weight('medium')
-                                    ->alignCenter(),
+                                    ->size(TextEntry\TextEntrySize::Large)
+                                    ->formatStateUsing(fn ($state) => $state ?? '—'),
+
+                                TextEntry::make('price')
+                                    ->label('Prix (€)')
+                                    ->size(TextEntry\TextEntrySize::Large)
+                                    ->formatStateUsing(fn ($state) => $state !== null ? number_format(floatval($state), 2, ',', ' ') . ' €' : '—'),
 
                                 ImageEntry::make('image')
                                     ->label('Image')
                                     ->height(120)
                                     ->width(120)
                                     ->alignCenter()
-                                    ->visible(fn($state) => !empty($state)),
+                                    ->visible(fn ($state) => !empty($state)),
 
                                 TextEntry::make('consigne_enabled')
                                     ->label('Consigne')
+                                    ->size(TextEntry\TextEntrySize::Large)
                                     ->formatStateUsing(function ($state, $record) {
-                                        if (!($record['consigne_enabled'] ?? false)) {
+                                        if (!($state ?? false)) {
                                             return 'Non';
                                         }
-                                        $type = $record['consigne_type'] ?? '';
-                                        return match ($type) {
+
+                                        return match ($record['consigne_type'] ?? '') {
                                             'ecocup' => 'Oui (Écocup 1€)',
                                             'assiette' => 'Oui (Assiette 1€)',
                                             default => 'Oui',
                                         };
-                                    })
-                                    ->alignCenter(),
+                                    }),
                             ])
-                            ->columns(3)
+                            ->columns(4)
                             ->columnSpanFull(),
                     ]),
             ]);
