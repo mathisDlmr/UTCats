@@ -19,8 +19,7 @@ class CreateCatRequest extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Envoyer l'email de notification
-        Mail::to('moi.moi@mail.fr')->send(new CatRequestSubmitted($this->record));
+        Mail::to('simde@assos.utc.fr')->send(new CatRequestSubmitted($this->record));
     }
 
     protected function getRedirectUrl(): string
