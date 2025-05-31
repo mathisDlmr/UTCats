@@ -52,6 +52,7 @@ class CatSale extends Model
     {
         $catCount = $this->catDevices()->count();
         $tpeCount = $this->tpeDevices()->count();
-        return ($catCount * 200) + ($tpeCount * 50);
+        $connexion = $this->catRequest->connexion === '4g' ? 150: 0;
+        return ($catCount * 200) + ($tpeCount * 50) + $connexion;
     }
 }
