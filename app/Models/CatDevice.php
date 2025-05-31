@@ -11,6 +11,10 @@ class CatDevice extends Model
 {
     use HasFactory;
 
+    protected $primaryKey = 'identifiant';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     protected $fillable = [
         'identifiant',
         'etat',
@@ -35,51 +39,6 @@ class CatDevice extends Model
     ];
 
     /**
-     * Scope pour les terminaux actifs
-     */
-    public function scopeActifs($query)
-    {
-        return $query->where('etat', 'ok')
-                     ->orWhere('etat', 'moyen');
-    }
-
-    /**
-     * Scope pour les terminaux dans la malette
-     */
-    public function scopeDansMalette($query)
-    {
-        return $query->where('dans_malette', true);
-    }
-
-    /**
-     * Scope pour les terminaux avec ping récent (dernières 24h)
-     */
-    public function scopePingRecent($query)
-    {
-        return $query->where('dernier_ping', '>=', now()->subDay());
-    }
-
-    /**
-     * Accesseur pour vérifier si le terminal est connecté récemment
-     */
-    protected function estConnecte(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => $this->dernier_ping && $this->dernier_ping->isAfter(now()->subMinutes(30))
-        );
-    }
-
-    /**
-     * Accesseur pour le temps depuis dernier ping
-     */
-    protected function tempsDernierPing(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => $this->dernier_ping ? $this->dernier_ping->diffForHumans() : 'Jamais'
-        );
-    }
-
-    /**
      * Accesseur pour le statut formaté
      */
     protected function statutFormate(): Attribute
@@ -87,5 +46,15 @@ class CatDevice extends Model
         return Attribute::make(
             get: fn () => self::ETATS[$this->etat] ?? $this->etat
         );
+    }
+
+    public function sales()
+    {
+        return $this->belongsToMany(CatSale::class, 'cat_sale_devices', 'cat_device_identifiant', 'cat_sale_id', 'identifiant', 'id');
+    }
+
+    public function isAvailable()
+    {
+        return ($this->etat === 'ok' || $this->etat === 'moyen') && !$this->sales()->whereIn('status', ['devices_assigned', 'retrieved'])->exists();
     }
 }

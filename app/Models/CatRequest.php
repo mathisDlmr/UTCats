@@ -14,9 +14,11 @@ class CatRequest extends Model
     protected $fillable = [
         'user_id',
         'asso',
+        'event_name',
         'start_date',
         'end_date',
         'cats_count',
+        'tpe_count',
         'status',
         'responsibles',
         'articles',
@@ -41,5 +43,10 @@ class CatRequest extends Model
             'accepted' => 'Accepté',
             'rejected' => 'Refusé',
         };
+    }
+
+    public function catSale()
+    {
+        return $this->hasOne(CatSale::class);
     }
 }

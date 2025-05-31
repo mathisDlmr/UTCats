@@ -18,7 +18,7 @@
     <h3>Responsables</h3>
     <ul>
         @foreach($catRequest->responsibles as $responsible)
-            <li>{{ $responsible['first_name'] }} {{ $responsible['last_name'] }}</li>
+            <li>{{ $responsible['name'] }}</li>
         @endforeach
     </ul>
 
