@@ -19,7 +19,11 @@ class CatRequest extends Model
         'end_date',
         'cats_count',
         'tpe_count',
+        'lieu',
+        'lieu_autre',
+        'connexion',
         'status',
+        'ready',
         'responsibles',
         'articles',
     ];

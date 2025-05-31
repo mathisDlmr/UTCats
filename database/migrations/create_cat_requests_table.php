@@ -17,7 +17,11 @@ return new class extends Migration
             $table->date('end_date');
             $table->integer('cats_count');
             $table->integer('tpe_count');
+            $table->string('lieu')->nullable();
+            $table->string('lieu_autre')->nullable();
+            $table->enum('connexion', ['4g', 'rhizome'])->nullable();
             $table->enum('status', ['pending', 'accepted', 'rejected'])->default('pending');
+            $table->boolean('ready')->default(false);
             $table->json('responsibles');
             $table->json('articles');
             $table->timestamps();

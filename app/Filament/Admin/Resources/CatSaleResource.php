@@ -24,115 +24,6 @@ class CatSaleResource extends Resource
     protected static ?string $modelLabel = 'Gestion demande CAT';
     protected static ?string $pluralModelLabel = 'Gestion demandes CAT';
 
-    public static function form(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Informations de la vente')
-                    ->schema([
-                        Forms\Components\Select::make('cat_request_id')
-                            ->label('Demande associée')
-                            ->relationship('catRequest', 'event_name')
-                            ->searchable()
-                            ->preload()
-                            ->disabled(),
-                        
-                        Forms\Components\Select::make('status')
-                            ->label('Statut')
-                            ->options([
-                                'configured' => 'Configurée',
-                                'devices_assigned' => 'Appareils assignés',
-                                'retrieved' => 'Matériel récupéré',
-                                'returned' => 'Matériel rendu',
-                            ])
-                            ->required()
-                            ->reactive(),
-                        
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Notes')
-                            ->rows(3),
-                    ])
-                    ->columns(2),
-
-                Forms\Components\Section::make('Attribution des appareils')
-                    ->schema([
-                        Forms\Components\Select::make('cat_devices')
-                            ->label('CATs assignés')
-                            ->multiple()
-                            ->relationship('catDevices', 'identifiant')
-                            ->options(function () {
-                                return CatDevice::where('etat', 'ok')
-                                    ->whereDoesntHave('sales', function ($query) {
-                                        $query->whereIn('status', ['devices_assigned', 'retrieved']);
-                                    })
-                                    ->pluck('identifiant', 'identifiant');
-                            })
-                            ->searchable()
-                            ->preload(),
-                        
-                        Forms\Components\Select::make('tpe_devices')
-                            ->label('TPE assignés')
-                            ->multiple()
-                            ->relationship('tpeDevices', 'identifiant')
-                            ->options(function () {
-                                return TpeDevice::where('etat', 'ok')
-                                    ->where('disponible', true)
-                                    ->whereDoesntHave('sales', function ($query) {
-                                        $query->whereIn('status', ['devices_assigned', 'retrieved']);
-                                    })
-                                    ->pluck('identifiant', 'identifiant');
-                            })
-                            ->searchable()
-                            ->preload(),
-                    ])
-                    ->visible(fn ($get) => in_array($get('status'), ['configured', 'devices_assigned', 'retrieved', 'returned'])),
-
-                Forms\Components\Section::make('Retrait du matériel')
-                    ->schema([
-                        Forms\Components\TextInput::make('bde_member_pickup')
-                            ->label('Membre BDE (remise)')
-                            ->maxLength(255),
-                        
-                        Forms\Components\TextInput::make('receiver_pickup')
-                            ->label('Personne qui récupère')
-                            ->maxLength(255),
-                        
-                        Forms\Components\Toggle::make('caution_collected')
-                            ->label('Caution récupérée')
-                            ->reactive(),
-                        
-                        Forms\Components\TextInput::make('caution_amount')
-                            ->label('Montant de la caution (€)')
-                            ->numeric()
-                            ->visible(fn ($get) => $get('caution_collected')),
-                        
-                        Forms\Components\DateTimePicker::make('pickup_at')
-                            ->label('Date/heure de retrait'),
-                    ])
-                    ->columns(2)
-                    ->visible(fn ($get) => in_array($get('status'), ['retrieved', 'returned'])),
-
-                Forms\Components\Section::make('Retour du matériel')
-                    ->schema([
-                        Forms\Components\TextInput::make('bde_member_return')
-                            ->label('Membre BDE (récupération)')
-                            ->maxLength(255),
-                        
-                        Forms\Components\TextInput::make('returner')
-                            ->label('Personne qui rend')
-                            ->maxLength(255),
-                        
-                        Forms\Components\Toggle::make('caution_returned')
-                            ->label('Caution rendue'),
-                        
-                        Forms\Components\DateTimePicker::make('returned_at')
-                            ->label('Date/heure de retour'),
-                    ])
-                    ->columns(2)
-                    ->visible(fn ($get) => $get('status') === 'returned'),
-            ]);
-    }
-
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -282,10 +173,19 @@ class CatSaleResource extends Resource
                 Tables\Columns\TextColumn::make('catRequest')
                     ->label('Appareils')
                     ->formatStateUsing(function ($record) {
-                        $cats = $record->catDevices->count();
-                        $tpes = $record->tpeDevices->count();
+                        $cats = $record->catRequest->cats_count;
+                        $tpes = $record->catRequest->tpe_count;
                         return "{$cats} CATs, {$tpes} TPE";
                     }),
+
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Connexion')
+                    ->formatStateUsing(fn ($record) => match($record->catRequest->connexion) {
+                        '4g' => '4G',
+                        'rhizome' => 'Rhizome',
+                        default => 'Réseau UTC',
+                    })
+                    ->alignCenter(),
                 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Statut')
@@ -326,7 +226,23 @@ class CatSaleResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                
+
+                Tables\Actions\Action::make('configure_sale')
+                    ->label('Vente configurée')
+                    ->icon('heroicon-o-cog')
+                    ->color('danger')
+                    ->visible(fn ($record) => $record->status === 'none')
+                    ->action(function ($record, array $data) {
+                        $record->update([
+                            'status' => 'configured',
+                        ]);
+                        
+                        Notification::make()
+                            ->title('Vente marqué comme configurée')
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\Action::make('assign_devices')
                     ->label('Assigner appareils')
                     ->icon('heroicon-o-cpu-chip')
@@ -339,6 +255,7 @@ class CatSaleResource extends Resource
                             //->maxItems(fn($state) => $record->catRequest->cats_count)
                             ->options(function ($record) {
                                 return CatDevice::where('etat', 'ok')
+                                    ->orWhere('etat', 'moyen')
                                     ->whereDoesntHave('sales', function ($query) {
                                         $query->whereIn('status', ['devices_assigned', 'retrieved']);
                                     })
