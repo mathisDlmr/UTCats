@@ -66,6 +66,7 @@ class CatRequestResource extends Resource
                         
                         Forms\Components\TextInput::make('cats_count')
                             ->label('Nombre de CATs')
+                            ->helperText('Prévoir une caution de 200€ par CAT')
                             ->required()
                             ->numeric()
                             ->minValue(1)
@@ -73,10 +74,40 @@ class CatRequestResource extends Resource
                         
                         Forms\Components\TextInput::make('tpe_count')
                             ->label('Nombre de TPE')
+                            ->helperText('Prévoir une caution de 50€ par TPE')
                             ->required()
                             ->numeric()
                             ->default(0)
                             ->maxValue(4),
+
+                        Forms\Components\Select::make('lieu')
+                            ->label('Lieu')
+                            ->options([
+                                'bf' => 'BF',
+                                'pic' => 'Pic',
+                                'jmde' => 'Jardin de la MDE',
+                                'parkingBf' => 'Parking de BF',
+                                'autre' => 'Autre',
+                            ])
+                            ->required()
+                            ->reactive(),
+
+                        Forms\Components\TextInput::make('lieu_autre')
+                            ->label('Précisez le lieu')
+                            ->visible(fn ($get) => $get('lieu') === 'autre')
+                            ->required(fn ($get) => $get('lieu') === 'autre')
+                            ->maxLength(255),
+
+                        Forms\Components\Select::make('connexion')
+                            ->label('Connexion')
+                            ->options([
+                                '4g' => '4G (Caution 50€)',
+                                'rhizome' => 'Rhizome',
+                            ])
+                            ->required()
+                            ->helperText("Le boitier 4G est suffisant pour utiliser les CATs sur des petites zones. Pour des zones plus larges, contactez Rhizome pour faire installer des poins d'accès sur place")
+                            ->visible(fn ($get) => $get('lieu') === 'autre')
+                            ->reactive(),
                     ])
                     ->columns(3),
 
@@ -280,6 +311,19 @@ class CatRequestResource extends Resource
                         'success' => 'accepted',
                         'danger' => 'rejected',
                     ]),
+
+                Tables\Columns\IconColumn::make('ready')
+                    ->label('Prêt')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
+                
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Caution')
+                    ->formatStateUsing(fn ($record) => $record ? 200*$record->cats_count + 50*$record->tpe_count + ($record->connexion === '4g' ? 50 : 0) . ' €' : '—')
+                    ->alignCenter(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
@@ -288,8 +332,7 @@ class CatRequestResource extends Resource
                         'pending' => 'En attente',
                         'accepted' => 'Accepté',
                         'rejected' => 'Refusé',
-                    ])
-                    ->default('pending'),
+                    ]),
                 Tables\Filters\Filter::make('future_end_date')
                     ->label('Événements à venir')
                     ->query(fn (Builder $query) => $query->whereDate('end_date', '>=', now()))
@@ -298,7 +341,7 @@ class CatRequestResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make()
-                    ->visible(fn ($record) => $record->status === 'pending'),
+                    ->visible(fn ($record) => $record->ready == false),
             ])
             ->defaultSort('created_at', 'desc')
             ->modifyQueryUsing(fn (Builder $query) => 
