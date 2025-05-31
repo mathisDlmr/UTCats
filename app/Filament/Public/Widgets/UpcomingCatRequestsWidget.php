@@ -57,6 +57,19 @@ class UpcomingCatRequestsWidget extends BaseWidget
                         'success' => 'accepted',
                         'danger' => 'rejected',
                     ]),
+
+                Tables\Columns\IconColumn::make('ready')
+                    ->label('Prêt')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
+                
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Caution')
+                    ->formatStateUsing(fn ($record) => $record ? 200*$record->cats_count + 50*$record->tpe_count + ($record->connexion === '4g' ? 50 : 0) . ' €' : '—')
+                    ->alignCenter(),
             ]);
     }
 }
