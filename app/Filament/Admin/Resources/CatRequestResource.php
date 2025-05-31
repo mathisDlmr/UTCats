@@ -14,6 +14,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Grid;
+use Filament\Infolists\Components\Split;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ImageEntry;
@@ -89,53 +90,61 @@ class CatRequestResource extends Resource
             ->schema([
                 Grid::make(1)
                     ->schema([
-                        TextEntry::make('status_display')
+                        TextEntry::make('asso')
                             ->label('')
-                            ->formatStateUsing(function ($record) {
-                                $status = match($record->status) {
-                                    'pending' => 'EN ATTENTE',
-                                    'accepted' => 'ACCEPTÉ',
-                                    'rejected' => 'REFUSÉ',
-                                };
-                                return $record->asso . ' - ' . $record->event_name . ' (' . $status . ')';
+                            ->formatStateUsing(function ($state, $record) {
+                                return ucfirst($record->asso ?? '') . ' - ' . ucfirst($record->event_name ?? '');
                             })
                             ->size('4xl')
                             ->weight('bold')
                             ->alignCenter()
-                            ->extraAttributes(['style' => 'font-size:2rem;']),
+                            ->extraAttributes(['style' => 'font-size:3rem;']),
                     ])
                     ->columnSpanFull(),
-                
-                Grid::make(2)->schema([
-                    Section::make('Informations demandeur')
-                        ->icon('heroicon-o-user')
-                        ->schema([
-                            TextEntry::make('user.email')
-                                ->label('Email'),
-                            TextEntry::make('user.firstName')
-                                ->label('Prénom'),
-                            TextEntry::make('user.lastName')
-                                ->label('Nom'),
-                        ]),
 
-                    Section::make('Informations événement')
-                        ->icon('heroicon-o-calendar')
-                        ->schema([
+                Section::make('Demandeur.euse')
+                    ->icon('heroicon-o-user')
+                    ->schema([
+                        Split::make([
+                            TextEntry::make('user')
+                                ->label('Prénom et Nom')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->formatStateUsing(fn ($state) => ucfirst($state->firstName) . ' ' . ucfirst($state->lastName)),
+                            
+                            TextEntry::make('user.email')
+                                ->label('Email')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->formatStateUsing(fn ($state) => $state ?? '—'),
+                        ])
+                        ->columns(2),
+                    ]),
+                
+                Section::make('Informations générales')
+                    ->icon('heroicon-o-information-circle')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextEntry::make('cats_count')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Nombre de CATs'),
+                            TextEntry::make('tpe_count')
+                                ->size(TextEntry\TextEntrySize::Large)
+                                ->label('Nombre de TPE'),
+                        ]),
+                        Grid::make(2)->schema([
                             TextEntry::make('start_date')
+                                ->size(TextEntry\TextEntrySize::Large)
                                 ->label('Date de début')
                                 ->formatStateUsing(fn ($state) => ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y'))),
                             TextEntry::make('end_date')
+                                ->size(TextEntry\TextEntrySize::Large)
                                 ->label('Date de fin')
                                 ->formatStateUsing(fn ($state) => ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y'))),
-                            TextEntry::make('cats_count')
-                                ->label('Nombre de CATs'),
-                            TextEntry::make('tpe_count')
-                                ->label('Nombre de TPE'),
                         ]),
-                ]),
+                    ]),
 
                 Section::make('Responsables')
                     ->icon('heroicon-o-users')
+                    ->description("Membres de l'asso capables de déverouiller et annuler des ventes sur les CATs")
                     ->schema([
                         RepeatableEntry::make('responsibles')
                             ->label('')
@@ -158,18 +167,20 @@ class CatRequestResource extends Resource
                             ->schema([
                                 TextEntry::make('name')
                                     ->label('Nom')
-                                    ->size(TextEntry\TextEntrySize::Large),
+                                    ->size(TextEntry\TextEntrySize::Large)
+                                    ->formatStateUsing(fn ($state) => $state ?? '—'),
 
                                 TextEntry::make('price')
                                     ->label('Prix (€)')
                                     ->size(TextEntry\TextEntrySize::Large)
-                                    ->formatStateUsing(fn ($state) => number_format(floatval($state), 2, ',', ' ') . ' €'),
+                                    ->formatStateUsing(fn ($state) => $state !== null ? number_format(floatval($state), 2, ',', ' ') . ' €' : '—'),
 
                                 ImageEntry::make('image')
                                     ->label('Image')
                                     ->height(120)
                                     ->width(120)
                                     ->alignCenter()
+                                    ->url(fn ($state) => $state ? asset('storage/' . ltrim($state, '/')) : null)
                                     ->visible(fn ($state) => !empty($state)),
                                     
                                 TextEntry::make('consigne_type')
@@ -187,16 +198,6 @@ class CatRequestResource extends Resource
                             ->columns(4)
                             ->columnSpanFull(),
                     ]),
-
-                Section::make('Notes administratives')
-                    ->icon('heroicon-o-document-text')
-                    ->schema([
-                        TextEntry::make('admin_notes')
-                            ->label('')
-                            ->formatStateUsing(fn ($state) => $state ?: 'Aucune note')
-                    ])
-                    ->visible(fn ($record) => !empty($record->admin_notes))
-                    ->columnSpanFull(),
             ]);
     }
 
@@ -221,14 +222,35 @@ class CatRequestResource extends Resource
                     ->sortable()
                     ->searchable(),
 
+                Tables\Columns\TextColumn::make('lieu')
+                    ->label('Lieu')
+                    ->formatStateUsing(fn ($state, $record) => match($state) {
+                        'bf' => 'BF',
+                        'pic' => 'Pic',
+                        'jmde' => 'Jardin de la MDE',
+                        'parkingBf' => 'Parking de BF',
+                        'autre' => $record->lieu_autre ?? 'Autre',
+                        default => $state,
+                    })
+                    ->alignCenter(),
+
+                Tables\Columns\TextColumn::make('connexion')
+                    ->label('Connexion')
+                    ->formatStateUsing(fn ($state) => match($state) {
+                        '4g' => '4G',
+                        'rhizome' => 'Rhizome',
+                        default => 'Réseau UTC',
+                    })
+                    ->alignCenter(),
+
                 Tables\Columns\TextColumn::make('start_date')
                     ->label('Début')
-                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y'))
+                    ->formatStateUsing(fn($state) => $state ? ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y')) : '')
                     ->sortable(),
                 
                 Tables\Columns\TextColumn::make('end_date')
                     ->label('Fin')
-                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y'))
+                    ->formatStateUsing(fn($state) => $state ? ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y')) : '')
                     ->sortable(),
                 
                 Tables\Columns\TextColumn::make('cats_count')
@@ -254,7 +276,7 @@ class CatRequestResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Demandé le')
-                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y H:i'))
+                    ->formatStateUsing(fn ($state) => ucfirst(\Carbon\Carbon::parse($state)->locale('fr')->translatedFormat('l d F Y H:i')))
                     ->sortable(),
             ])
             ->filters([
@@ -285,10 +307,9 @@ class CatRequestResource extends Resource
                             'processed_at' => now(),
                         ]);
                         
-                        // Créer automatiquement la vente
                         CatSale::create([
                             'cat_request_id' => $record->id,
-                            'status' => 'configured',
+                            'status' => 'none',
                         ]);
                         
                         Notification::make()
